@@ -53,7 +53,7 @@ export default function Page() {
                     </select>
                   </label>
                   <label>Tanggal surat
-                    <input type="date" id="date" min="2027-01-01" max="2027-12-31" defaultValue="2027-01-01" required />
+                    <input type="date" id="date" required />
                   </label>
                 </div>
                 <label id="anchor-field" hidden>Nomor induk<select id="anchor"></select></label>
@@ -110,7 +110,7 @@ export default function Page() {
               </fieldset>
               <div className="action-submit">
                 <div><strong>Siap membuat nomor?</strong><small>Pastikan detail surat sudah sesuai.</small></div>
-                <button id="issue">Ambil Nomor Contoh <span aria-hidden="true">→</span></button>
+                <button id="issue">Ambil Nomor <span aria-hidden="true">→</span></button>
               </div>
               <p id="form-status" role="status"></p>
             </div>
@@ -132,7 +132,7 @@ export default function Page() {
               <div className="section-heading">
                 <span className="eyebrow">ARSIP AKTIVITAS</span>
                 <h2 id="history-title">Riwayat nomor surat</h2>
-                <p>Nomor yang dibuat di sesi register lokal ini.</p>
+                <p>Riwayat hanya tersimpan di browser ini.</p>
               </div>
               <div className="history-controls">
                 <label htmlFor="history-series">Jenis surat
@@ -165,7 +165,6 @@ export default function Page() {
           </section>
         </div>
 
-        <footer className="footer"><span>Nomor Surat <strong>2027</strong></span><span>Workspace lokal · Mode simulasi</span></footer>
       </main>
       <Script src="/nomor-surat.js" strategy="afterInteractive" />
     </>

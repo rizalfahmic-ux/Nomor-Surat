@@ -129,8 +129,6 @@ legend { margin-bottom: .4rem; }
 .history-page-button { min-height: 2.4rem; border: 1px solid #dfe6f2; padding: .45rem .7rem; background: #f7f8fc; color: var(--ink); font-size: .78rem; }
 .history-page-button:hover:not(:disabled) { border-color: #bdcaff; background: #edf1ff; color: var(--blue); box-shadow: none; }
 .history-page-button:disabled { cursor: not-allowed; opacity: .48; }
-.footer { display: flex; justify-content: space-between; gap: 1rem; padding: 1.1rem .2rem 0; color: #8793a6; font-size: .75rem; }
-.footer strong { color: var(--blue); }
 [hidden] { display: none !important; }
 
 @media (max-width: 48rem) {
@@ -157,7 +155,6 @@ legend { margin-bottom: .4rem; }
   .history-pagination { align-items: flex-start; flex-direction: column; }
   .history-pagination > div { width: 100%; }
   .history-page-button { flex: 1; }
-  .footer { flex-direction: column; gap: .2rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {

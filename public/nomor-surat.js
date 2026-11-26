@@ -8,6 +8,10 @@ const records = katalog.map(([code,label,group,page]) => ({
 }));
 const byCode = new Map(records.map(record => [record.code,record]));
 const groups = new Map(records.map(record => [record.code.split(' ')[0],record.group]));
+const currentYear = new Date().getFullYear();
+get('date').min = currentYear + '-01-01';
+get('date').max = currentYear + '-12-31';
+get('date').value = currentYear + '-01-01';
 for (const [prefix,label] of groups) {
   if (['SS','VS'].includes(prefix)) continue;
   const option = document.createElement('option');
@@ -22,7 +26,11 @@ let inserting = false;
 let historyPage = 1;
 const registerKey = 'nomor-surat-2027-simulasi-v1';
 const register = JSON.parse(localStorage.getItem(registerKey) || '[]');
-for (const row of register) counters[row.series] = Math.max(counters[row.series], row.base);
+for (const row of register) {
+  if (row.date && row.date.startsWith(currentYear + '-') && Object.prototype.hasOwnProperty.call(counters,row.series)) {
+    counters[row.series] = Math.max(counters[row.series], row.base);
+  }
+}
 
 function suffix(index) {
   let result = '';
@@ -54,7 +62,7 @@ function showMenu(menu) {
   for (const id of ['regular','insert','catalog']) get(id).setAttribute('aria-pressed', String(id === menu));
   get('insert-note').hidden = !inserting;
   get('anchor-field').hidden = !inserting;
-  get('issue').textContent = inserting ? 'Sisipkan Nomor Contoh' : 'Ambil Nomor Contoh';
+  get('issue').textContent = inserting ? 'Sisipkan Nomor' : 'Ambil Nomor';
   get('form-status').textContent = '';
   if (inserting) refreshAnchors();
   if (catalogOpen) renderCatalog();
@@ -323,15 +331,15 @@ get('form').onsubmit = event => {
   const date = get('date').value;
   const base = Number(get('anchor').value);
   if (inserting && !numbersForDate().some(row => row.base === base)) {
-    get('form-status').textContent = 'Tanggal dan seri ini belum memiliki nomor induk pada register simulasi.';
+    get('form-status').textContent = 'Tanggal dan seri ini belum memiliki nomor induk.';
     return;
   }
-  const previous = register.reduce((max,row) => row.series === series && row.base === base ? Math.max(max,row.suffix) : max,0);
+  const previous = register.reduce((max,row) => row.series === series && row.date === date && row.base === base ? Math.max(max,row.suffix) : max,0);
   const entries = Array.from({length:quantity}, (_, index) => {
     const sequence = inserting ? base : counters[series] + index + 1;
     const order = inserting ? previous + index + 1 : 0;
     const number = series + '-' + String(sequence).padStart(4,'0') + (order ? '.' + suffix(order) : '')
-      + '/52020/' + formatCode(selected.code) + '/2027';
+      + '/52020/' + formatCode(selected.code) + '/' + currentYear;
     return {series,date,base:sequence,suffix:order,number,subject,code:selected.code};
   });
   localStorage.setItem(registerKey, JSON.stringify([...register,...entries]));
@@ -346,7 +354,7 @@ get('form').onsubmit = event => {
     row.textContent = number;
     return row;
   }));
-  get('result-title').textContent = quantity + ' nomor contoh';
+  get('result-title').textContent = quantity + ' nomor berhasil dibuat';
   get('detail').textContent = subject + ' · ' + selected.label;
   get('copy-status').textContent = '';
   get('form-status').textContent = '';
@@ -373,7 +381,7 @@ function renderHistory() {
   const start = (historyPage - 1) * pageSize;
   const visibleRows = rows.slice(start, start + pageSize);
   get('history-status').textContent = rows.length
-    ? rows.length + ' nomor simulasi tercatat'
+    ? rows.length + ' nomor tercatat'
     : 'Belum ada nomor tercatat untuk jenis surat ini.';
   get('history-page-info').textContent = 'Halaman ' + historyPage + ' dari ' + pageCount
     + ' · Menampilkan ' + (rows.length ? start + 1 : 0) + '–' + Math.min(start + pageSize, rows.length)

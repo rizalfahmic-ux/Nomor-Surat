@@ -1,8 +1,8 @@
 import './globals.css';
 
 export const metadata = {
-  title: 'Nomor Surat 2027',
-  description: 'Simulasi register surat dan katalog klasifikasi arsip BPS.'
+  title: 'Pengelolaan Nomor Surat | BPS Kabupaten Lombok Tengah',
+  description: 'Pengelolaan nomor surat dan katalog klasifikasi arsip BPS Kabupaten Lombok Tengah.'
 };
 
 export default function Layout({ children }) {
