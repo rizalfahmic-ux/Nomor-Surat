@@ -31,7 +31,9 @@ Untuk Vercel, hubungkan repositori ini dan gunakan pengaturan Next.js bawaan. Ap
 
 - Pilih seri B, SK, R, atau S dan isi perihal. Gunakan rekomendasi atau cari kode langsung. Tab Klasifikasi Arsip juga menyediakan tautan ke PDF sumber.
 - Ambil satu atau beberapa nomor. Untuk sisipan, pilih tanggal, seri, dan nomor induk yang sudah tersimpan. Urutan sisipan menggunakan akhiran seperti `0010.A`, `0010.B`, dan seterusnya.
+- Setelah nomor berhasil dibuat, kartu pintasan membuka Meeting Set, Back Office Selindo BPS, dan Simandalika di tab baru.
 - Riwayat di bawah formulir menampilkan nomor menurut jenis surat, diurutkan dari nomor urut terbesar.
+- Versi demo tersedia di `/demo`; nomor dan riwayat contoh hanya berada di memori browser dan direset saat halaman dimuat ulang.
 
 ## Penyimpanan register
 

@@ -1,16 +1,32 @@
 import Script from 'next/script';
 
 export default function Page() {
+  return <ApplicationPage />;
+}
+
+export function ApplicationPage({ demo = false }) {
   return (
     <>
-      <main className="shell">
+      <main id="app-shell" className="shell" data-demo={demo ? 'true' : 'false'}>
         <header className="page-header">
           <img className="bps-logo" src="/bps-logo.jpg" alt="Logo Badan Pusat Statistik" />
           <div className="page-header-copy">
             <h1>Pengelolaan Nomor Surat</h1>
             <p>BPS Kabupaten Lombok Tengah</p>
           </div>
+          <a className="environment-link" href={demo ? '/' : '/demo'}>
+            {demo ? 'Aplikasi utama' : 'Coba versi demo'} <span aria-hidden="true">→</span>
+          </a>
         </header>
+
+        {demo && (
+          <aside className="demo-notice" aria-label="Pemberitahuan mode demo">
+            <strong>MODE DEMO · DATA SIMULASI</strong>
+            <span>
+              Nomor dan riwayat di halaman ini hanya contoh sementara, tidak disimpan, dan tidak berlaku untuk surat resmi.
+            </span>
+          </aside>
+        )}
 
         <nav aria-label="Menu Nomor Surat">
           <button type="button" id="regular" aria-pressed="true"><span className="nav-index">01</span>Ambil Nomor</button>
@@ -125,6 +141,38 @@ export default function Page() {
             <ol id="numbers"></ol>
             <button type="button" id="copy">Salin Semua Nomor</button>
             <p id="copy-status" role="status"></p>
+            <div className="app-shortcuts" aria-labelledby="app-shortcuts-title">
+              <div className="app-shortcuts-heading">
+                <h3 id="app-shortcuts-title">Lanjutkan di aplikasi terkait</h3>
+                <p>Pilih aplikasi yang ingin Anda buka untuk menggunakan nomor surat ini.</p>
+              </div>
+              <div className="app-shortcut-grid">
+                <a className="app-shortcut" href="https://meeting-set.bpsloteng.net/" target="_blank" rel="noopener noreferrer">
+                  <img className="app-shortcut-logo" src="/meeting-set-logo.png" alt="" />
+                  <span className="app-shortcut-copy">
+                    <strong>Meeting Set</strong>
+                    <small>Buka aplikasi Meeting Set</small>
+                  </span>
+                  <span className="app-shortcut-arrow" aria-hidden="true">↗</span>
+                </a>
+                <a className="app-shortcut" href="https://backoffice.bps.go.id/" target="_blank" rel="noopener noreferrer">
+                  <img className="app-shortcut-logo" src="/backoffice-selindo-logo.png" alt="" />
+                  <span className="app-shortcut-copy">
+                    <strong>Back Office Selindo BPS</strong>
+                    <small>Buka Back Office Selindo</small>
+                  </span>
+                  <span className="app-shortcut-arrow" aria-hidden="true">↗</span>
+                </a>
+                <a className="app-shortcut" href="https://simandalika.bpsloteng.net/login" target="_blank" rel="noopener noreferrer">
+                  <img className="app-shortcut-logo" src="/simandalika-logo.png" alt="" />
+                  <span className="app-shortcut-copy">
+                    <strong>Simandalika</strong>
+                    <small>Buka aplikasi Simandalika</small>
+                  </span>
+                  <span className="app-shortcut-arrow" aria-hidden="true">↗</span>
+                </a>
+              </div>
+            </div>
           </section>
 
           <section id="history" aria-labelledby="history-title">
@@ -132,7 +180,7 @@ export default function Page() {
               <div className="section-heading">
                 <span className="eyebrow">ARSIP AKTIVITAS</span>
                 <h2 id="history-title">Riwayat nomor surat</h2>
-                <p>Riwayat tersimpan di register bersama.</p>
+                <p>{demo ? 'Riwayat simulasi hanya tersedia selama halaman ini terbuka.' : 'Riwayat tersimpan di register bersama.'}</p>
               </div>
               <div className="history-controls">
                 <label htmlFor="history-series">Jenis surat

@@ -27,8 +27,87 @@ let inserting = false;
 let historyPage = 1;
 let historyRequest = 0;
 let anchorRequest = 0;
+const demoMode = get('app-shell').dataset.demo === 'true';
+
+function makeDemoRecord({series, date = dateValue, base, suffix = 0, subject, code}) {
+  let suffixIndex = suffix;
+  let suffixText = '';
+  while (suffixIndex > 0) {
+    suffixIndex -= 1;
+    suffixText = String.fromCharCode(65 + suffixIndex % 26) + suffixText;
+    suffixIndex = Math.floor(suffixIndex / 26);
+  }
+  suffixText = suffixText ? '.' + suffixText : '';
+  return {
+    series,
+    date,
+    base,
+    suffix,
+    number:series + '-' + String(base).padStart(4,'0') + suffixText + '/52020/' + formatCode(code) + '/' + currentYear,
+    subject,
+    code
+  };
+}
+
+let demoRegister = demoMode ? [
+  makeDemoRecord({series:'B', base:1, subject:'Surat tugas petugas pendataan', code:'KP 650'}),
+  makeDemoRecord({series:'B', base:2, subject:'Undangan rapat koordinasi kegiatan statistik', code:'HM 340'}),
+  makeDemoRecord({series:'B', base:3, subject:'Pelatihan petugas sensus', code:'SS 220'}),
+  makeDemoRecord({series:'SK', base:1, subject:'Penetapan tim pelaksana kegiatan', code:'KP 170'})
+] : [];
+const demoCounters = new Map(['B','SK','R','S'].map(series => [
+  series,
+  Math.max(0, ...demoRegister.filter(row => row.series === series && row.suffix === 0).map(row => row.base))
+]));
+const demoSuffixCounters = new Map();
+
+function createDemoNumbers({series, date, subject, code, quantity, anchorBase}) {
+  let base = anchorBase;
+  let firstSuffix = 0;
+  if (anchorBase !== undefined) {
+    const anchorExists = demoRegister.some(row =>
+      row.series === series && row.date === date && row.base === anchorBase && row.suffix === 0
+    );
+    if (!anchorExists) throw new Error('Nomor induk simulasi tidak ditemukan pada tanggal dan jenis surat tersebut.');
+    const counterKey = series + ':' + anchorBase;
+    firstSuffix = (demoSuffixCounters.get(counterKey) || 0) + 1;
+    demoSuffixCounters.set(counterKey, firstSuffix + quantity - 1);
+  } else {
+    base = (demoCounters.get(series) || 0) + 1;
+    demoCounters.set(series, base + quantity - 1);
+  }
+
+  const records = Array.from({length:quantity}, (_, index) => makeDemoRecord({
+    series,
+    date,
+    base:anchorBase === undefined ? base + index : base,
+    suffix:anchorBase === undefined ? 0 : firstSuffix + index,
+    subject,
+    code
+  }));
+  demoRegister.push(...records);
+  return records;
+}
 
 async function fetchRegister({series = get('history-series').value, date, page = historyPage, pageSize = Number(get('history-page-size').value)} = {}) {
+  if (demoMode) {
+    const records = demoRegister
+      .filter(row => row.series === series)
+      .sort((a,b) => b.base - a.base || b.suffix - a.suffix);
+    const usage = new Map();
+    for (const row of demoRegister) usage.set(row.code, (usage.get(row.code) || 0) + 1);
+    const favorites = [...usage.entries()]
+      .sort((a,b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .slice(0,5)
+      .map(([code,count]) => ({code,count}));
+    return {
+      records:records.slice((page - 1) * pageSize, page * pageSize),
+      total:records.length,
+      favorites,
+      anchors:date ? records.filter(row => row.date === date && row.suffix === 0) : []
+    };
+  }
+
   const params = new URLSearchParams({
     series,
     year: String(currentYear),
@@ -43,6 +122,8 @@ async function fetchRegister({series = get('history-series').value, date, page =
 }
 
 async function createNumbers(payload) {
+  if (demoMode) return createDemoNumbers(payload);
+
   const response = await fetch('/api/register', {
     method:'POST',
     headers:{'Content-Type':'application/json'},
@@ -357,7 +438,7 @@ get('form').onsubmit = async event => {
   const base = Number(get('anchor').value);
   const submitButton = get('issue');
   submitButton.disabled = true;
-  get('form-status').textContent = 'Menyimpan nomor ke register bersama…';
+  get('form-status').textContent = demoMode ? 'Membuat nomor simulasi sementara…' : 'Menyimpan nomor ke register bersama…';
   try {
     issued = (await createNumbers({
       series,
@@ -375,7 +456,7 @@ get('form').onsubmit = async event => {
       row.textContent = number;
       return row;
     }));
-    get('result-title').textContent = quantity + ' nomor berhasil dibuat';
+    get('result-title').textContent = demoMode ? quantity + ' nomor simulasi dibuat' : quantity + ' nomor berhasil dibuat';
     get('detail').textContent = subject + ' · ' + selected.label;
     get('copy-status').textContent = '';
     get('form-status').textContent = '';
@@ -403,7 +484,7 @@ async function renderHistory() {
   const series = get('history-series').value;
   const pageSize = Number(get('history-page-size').value);
   const requestId = ++historyRequest;
-  get('history-status').textContent = 'Memuat riwayat…';
+  get('history-status').textContent = demoMode ? 'Memuat riwayat simulasi…' : 'Memuat riwayat…';
   try {
     const requestedPage = historyPage;
     const result = await fetchRegister({series, page:requestedPage, pageSize});
