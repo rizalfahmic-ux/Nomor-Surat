@@ -1,6 +1,6 @@
 # Pengelolaan Nomor Surat
 
-Aplikasi Next.js App Router dengan ekspor statis untuk BPS Kabupaten Lombok Tengah. Katalog klasifikasi dan PDF BPS disertakan di folder `public`. Tahun pada tanggal dan nomor mengikuti tahun kalender saat aplikasi dibuka.
+Aplikasi Next.js App Router untuk BPS Kabupaten Lombok Tengah. Katalog klasifikasi dan PDF BPS disertakan di folder `public`. Tahun pada tanggal dan nomor mengikuti tahun kalender saat aplikasi dibuka.
 
 ## Menjalankan di Windows atau macOS
 
@@ -15,9 +15,17 @@ Aplikasi Next.js App Router dengan ekspor statis untuk BPS Kabupaten Lombok Teng
 
 4. Buka http://localhost:3000.
 
+## Database Neon
+
+Register surat disimpan bersama di PostgreSQL Neon. Buat database di Neon, salin connection string, lalu simpan sebagai `DATABASE_URL` di file `.env.local` untuk pengembangan lokal. Jangan commit file `.env.local` atau membagikan connection string.
+
+Di Vercel, tambahkan `DATABASE_URL` pada Environment Variables untuk environment yang digunakan, lalu deploy ulang. API membuat tabel dan fungsi register secara otomatis pada permintaan pertama. Riwayat yang sebelumnya tersimpan di browser tidak otomatis diimpor.
+
+API register saat ini tidak memerlukan login. Siapa pun yang memiliki URL dapat membaca riwayat dan membuat nomor; batasi akses aplikasi sebelum digunakan sebagai register resmi.
+
 ## Deploy
 
-Untuk Vercel, unggah isi folder ini ke repositori Git dan impor sebagai proyek Next.js. Gunakan pengaturan bawaan. Untuk hosting statis lain, jalankan `npm run build` lalu unggah isi folder `out`.
+Untuk Vercel, hubungkan repositori ini dan gunakan pengaturan Next.js bawaan. Aplikasi memerlukan runtime server untuk API database; hosting statis dari folder `out` tidak didukung.
 
 ## Penggunaan
 
@@ -25,8 +33,8 @@ Untuk Vercel, unggah isi folder ini ke repositori Git dan impor sebagai proyek N
 - Ambil satu atau beberapa nomor. Untuk sisipan, pilih tanggal, seri, dan nomor induk yang sudah tersimpan. Urutan sisipan menggunakan akhiran seperti `0010.A`, `0010.B`, dan seterusnya.
 - Riwayat di bawah formulir menampilkan nomor menurut jenis surat, diurutkan dari nomor urut terbesar.
 
-## Penyimpanan lokal
+## Penyimpanan register
 
-Riwayat dan penghitung nomor tersimpan di `localStorage` browser untuk alamat situs itu. Browser, perangkat, atau alamat situs yang berbeda memiliki register sendiri dan dapat menerbitkan nomor yang sama. Menghapus data situs juga menghapus register lokal. Penomoran resmi yang digunakan bersama membutuhkan satu register pusat dengan mekanisme penguncian pemberian nomor.
+Riwayat dan penghitung nomor disimpan di database Neon dan dibagikan oleh semua pengguna aplikasi. Pengalokasian nomor dilakukan secara atomik di database untuk mencegah duplikasi akibat permintaan bersamaan.
 
 Font diambil dari Google Fonts bila tersedia. Jika font gagal dimuat, browser memakai font sistem.

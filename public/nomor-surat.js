@@ -21,39 +21,56 @@ for (const [prefix,label] of groups) {
   option.textContent = prefix + ' — ' + label;
   get('purpose').append(option);
 }
-const counters = {B:0, SK:0, R:0, S:0};
 let selected;
 let issued = [];
 let inserting = false;
 let historyPage = 1;
-const registerKey = 'nomor-surat-2027-simulasi-v1';
-const register = JSON.parse(localStorage.getItem(registerKey) || '[]');
-for (const row of register) {
-  if (row.date && row.date.startsWith(currentYear + '-') && Object.prototype.hasOwnProperty.call(counters,row.series)) {
-    counters[row.series] = Math.max(counters[row.series], row.base);
-  }
-}
+let historyRequest = 0;
+let anchorRequest = 0;
 
-function suffix(index) {
-  let result = '';
-  for (let value = index; value > 0; value = Math.floor((value - 1) / 26)) {
-    result = String.fromCharCode(65 + (value - 1) % 26) + result;
-  }
+async function fetchRegister({series = get('history-series').value, date, page = historyPage, pageSize = Number(get('history-page-size').value)} = {}) {
+  const params = new URLSearchParams({
+    series,
+    year: String(currentYear),
+    page: String(page),
+    pageSize: String(pageSize)
+  });
+  if (date) params.set('date', date);
+  const response = await fetch('/api/register?' + params, {cache:'no-store'});
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || 'Register tidak dapat dibaca.');
   return result;
 }
 
-function numbersForDate() {
-  return register.filter(row => !row.suffix && row.series === get('series').value && row.date === get('date').value);
+async function createNumbers(payload) {
+  const response = await fetch('/api/register', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(payload)
+  });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || 'Nomor tidak dapat dibuat.');
+  return result.records;
 }
 
-function refreshAnchors() {
-  const rows = numbersForDate().sort((a,b)=>b.base-a.base);
-  get('anchor').replaceChildren(...(rows.length ? rows : [{base:'',number:'Belum ada nomor pada tanggal dan seri ini'}]).map(row => {
-    const option = document.createElement('option');
-    option.value = row.base;
-    option.textContent = row.number;
-    return option;
-  }));
+async function refreshAnchors() {
+  const date = get('date').value;
+  if (!date) return;
+  const requestId = ++anchorRequest;
+  try {
+    const {anchors} = await fetchRegister({series:get('series').value, date, page:1});
+    if (requestId !== anchorRequest) return;
+    get('anchor').replaceChildren(...(anchors.length ? anchors : [{base:'',number:'Belum ada nomor pada tanggal dan seri ini'}]).map(row => {
+      const option = document.createElement('option');
+      option.value = row.base;
+      option.textContent = row.number;
+      return option;
+    }));
+    get('form-status').textContent = '';
+  } catch (error) {
+    if (requestId !== anchorRequest) return;
+    get('form-status').textContent = error.message;
+  }
 }
 
 function showMenu(menu) {
@@ -88,7 +105,10 @@ function renderCatalog() {
 
 for (const id of ['regular','insert','catalog']) get(id).onclick = () => showMenu(id);
 get('catalog-search').oninput = renderCatalog;
-get('date').onchange = () => { if (inserting) refreshAnchors(); };
+get('date').onchange = () => {
+  if (inserting) refreshAnchors();
+  renderHistory();
+};
 
 function display(items, message) {
   get('choice-status').textContent = message;
@@ -319,7 +339,7 @@ document.querySelectorAll('[name=mode]').forEach(input => input.onchange = () =>
   get('quantity').disabled = !batch;
 });
 
-get('form').onsubmit = event => {
+get('form').onsubmit = async event => {
   event.preventDefault();
   const subject = get('subject').value.trim();
   if (!subject || !selected) {
@@ -329,39 +349,45 @@ get('form').onsubmit = event => {
   const series = get('series').value;
   const batch = document.querySelector('[name=mode]:checked').value === 'batch';
   const quantity = batch ? get('quantity').valueAsNumber : 1;
-  if (!Number.isInteger(quantity) || quantity < (batch ? 2 : 1) || quantity > 1000) return;
-  const date = get('date').value;
-  const base = Number(get('anchor').value);
-  if (inserting && !numbersForDate().some(row => row.base === base)) {
-    get('form-status').textContent = 'Tanggal dan seri ini belum memiliki nomor induk.';
+  if (!Number.isInteger(quantity) || quantity < (batch ? 2 : 1) || quantity > 1000) {
+    get('form-status').textContent = 'Jumlah nomor harus antara ' + (batch ? '2' : '1') + ' dan 1000.';
     return;
   }
-  const previous = register.reduce((max,row) => row.series === series && row.date === date && row.base === base ? Math.max(max,row.suffix) : max,0);
-  const entries = Array.from({length:quantity}, (_, index) => {
-    const sequence = inserting ? base : counters[series] + index + 1;
-    const order = inserting ? previous + index + 1 : 0;
-    const number = series + '-' + String(sequence).padStart(4,'0') + (order ? '.' + suffix(order) : '')
-      + '/52020/' + formatCode(selected.code) + '/' + currentYear;
-    return {series,date,base:sequence,suffix:order,number,subject,code:selected.code};
-  });
-  localStorage.setItem(registerKey, JSON.stringify([...register,...entries]));
-  register.push(...entries);
-  renderFavorites();
-  if (!inserting) counters[series] += entries.length;
-  issued = entries.map(entry=>entry.number);
-  get('history-series').value = series;
-  renderHistory();
-  get('numbers').replaceChildren(...issued.map(number => {
-    const row = document.createElement('li');
-    row.textContent = number;
-    return row;
-  }));
-  get('result-title').textContent = quantity + ' nomor berhasil dibuat';
-  get('detail').textContent = subject + ' · ' + selected.label;
-  get('copy-status').textContent = '';
-  get('form-status').textContent = '';
-  get('result').hidden = false;
-  get('result').scrollIntoView({block:'nearest'});
+  const date = get('date').value;
+  const base = Number(get('anchor').value);
+  const submitButton = get('issue');
+  submitButton.disabled = true;
+  get('form-status').textContent = 'Menyimpan nomor ke register bersama…';
+  try {
+    issued = (await createNumbers({
+      series,
+      date,
+      subject,
+      code:selected.code,
+      quantity,
+      ...(inserting ? {anchorBase:base} : {})
+    })).map(record => record.number);
+    historyPage = 1;
+    get('history-series').value = series;
+    await renderHistory();
+    get('numbers').replaceChildren(...issued.map(number => {
+      const row = document.createElement('li');
+      row.textContent = number;
+      return row;
+    }));
+    get('result-title').textContent = quantity + ' nomor berhasil dibuat';
+    get('detail').textContent = subject + ' · ' + selected.label;
+    get('copy-status').textContent = '';
+    get('form-status').textContent = '';
+    get('result').hidden = false;
+    get('result').scrollIntoView({block:'nearest'});
+    if (inserting) await refreshAnchors();
+  } catch (error) {
+    get('form-status').textContent = error.message;
+  } finally {
+    submitButton.disabled = false;
+    submitButton.textContent = inserting ? 'Sisipkan Nomor' : 'Ambil Nomor';
+  }
 };
 
 get('copy').onclick = async () => {
@@ -373,37 +399,70 @@ get('copy').onclick = async () => {
   }
 };
 
-function renderHistory() {
+async function renderHistory() {
   const series = get('history-series').value;
-  const rows = register.filter(row => row.series === series)
-    .sort((a,b) => b.base - a.base || b.suffix - a.suffix);
   const pageSize = Number(get('history-page-size').value);
-  const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
-  historyPage = Math.min(historyPage, pageCount);
-  const start = (historyPage - 1) * pageSize;
-  const visibleRows = rows.slice(start, start + pageSize);
-  get('history-status').textContent = rows.length
-    ? rows.length + ' nomor tercatat'
-    : 'Belum ada nomor tercatat untuk jenis surat ini.';
-  get('history-page-info').textContent = 'Halaman ' + historyPage + ' dari ' + pageCount
-    + ' · Menampilkan ' + (rows.length ? start + 1 : 0) + '–' + Math.min(start + pageSize, rows.length)
-    + ' dari ' + rows.length + ' nomor';
-  get('history-pagination').hidden = pageCount <= 1;
-  get('history-prev').disabled = historyPage <= 1;
-  get('history-next').disabled = historyPage >= pageCount;
-  get('history-rows').replaceChildren(...visibleRows.map(record => {
-    const row = document.createElement('li');
-    const number = document.createElement('strong');
-    const detail = document.createElement('span');
-    number.textContent = record.number;
-    detail.textContent = record.date.split('-').reverse().join('/') + (record.subject ? ' · ' + record.subject : '');
-    row.append(number, detail);
-    return row;
+  const requestId = ++historyRequest;
+  get('history-status').textContent = 'Memuat riwayat…';
+  try {
+    const requestedPage = historyPage;
+    const result = await fetchRegister({series, page:requestedPage, pageSize});
+    const pageCount = Math.max(1, Math.ceil(result.total / pageSize));
+    historyPage = Math.min(historyPage, pageCount);
+    const pageResult = historyPage === requestedPage
+      ? result
+      : await fetchRegister({series, page:historyPage, pageSize});
+    if (requestId !== historyRequest) return;
+    get('history-status').textContent = result.total
+      ? result.total + ' nomor tercatat'
+      : 'Belum ada nomor tercatat untuk jenis surat ini.';
+    const start = (historyPage - 1) * pageSize;
+    get('history-page-info').textContent = 'Halaman ' + historyPage + ' dari ' + pageCount
+      + ' · Menampilkan ' + (result.total ? start + 1 : 0) + '–' + Math.min(start + pageSize, result.total)
+      + ' dari ' + result.total + ' nomor';
+    get('history-pagination').hidden = pageCount <= 1;
+    get('history-prev').disabled = historyPage <= 1;
+    get('history-next').disabled = historyPage >= pageCount;
+    get('history-rows').replaceChildren(...pageResult.records.map(record => {
+      const row = document.createElement('li');
+      const number = document.createElement('strong');
+      const detail = document.createElement('span');
+      number.textContent = record.number;
+      detail.textContent = record.date.split('-').reverse().join('/') + (record.subject ? ' · ' + record.subject : '');
+      row.append(number, detail);
+      return row;
+    }));
+    renderFavorites(result.favorites);
+  } catch (error) {
+    if (requestId !== historyRequest) return;
+    get('history-status').textContent = error.message;
+    get('history-pagination').hidden = true;
+    get('history-rows').replaceChildren();
+  }
+}
+
+function renderFavorites(favorites = []) {
+  const topFavorites = favorites
+    .map(item => ({record:byCode.get(item.code), count:item.count}))
+    .filter(item => item.record);
+  get('favorites-empty').hidden = topFavorites.length > 0;
+  get('favorite-codes').replaceChildren(...topFavorites.map(({record,count}) => {
+    const item = document.createElement('li');
+    const button = document.createElement('button');
+    const usageCount = document.createElement('small');
+    button.type = 'button';
+    button.className = 'favorite-choice';
+    button.textContent = formatCode(record.code) + ' · ' + record.label;
+    usageCount.textContent = 'Dipakai pada ' + count + ' nomor';
+    button.append(usageCount);
+    button.onclick = () => selectRecord(record);
+    item.append(button);
+    return item;
   }));
 }
+
 get('history-series').onchange = () => { historyPage = 1; renderHistory(); };
 get('history-page-size').onchange = () => { historyPage = 1; renderHistory(); };
-get('history-prev').onclick = () => { historyPage -= 1; renderHistory(); };
+get('history-prev').onclick = () => { historyPage = Math.max(1, historyPage - 1); renderHistory(); };
 get('history-next').onclick = () => { historyPage += 1; renderHistory(); };
 renderHistory();
-renderFavorites();

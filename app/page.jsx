@@ -132,7 +132,7 @@ export default function Page() {
               <div className="section-heading">
                 <span className="eyebrow">ARSIP AKTIVITAS</span>
                 <h2 id="history-title">Riwayat nomor surat</h2>
-                <p>Riwayat hanya tersimpan di browser ini.</p>
+                <p>Riwayat tersimpan di register bersama.</p>
               </div>
               <div className="history-controls">
                 <label htmlFor="history-series">Jenis surat
