@@ -8,10 +8,12 @@ const records = katalog.map(([code,label,group,page]) => ({
 }));
 const byCode = new Map(records.map(record => [record.code,record]));
 const groups = new Map(records.map(record => [record.code.split(' ')[0],record.group]));
-const currentYear = new Date().getFullYear();
+const today = new Date();
+const currentYear = today.getFullYear();
+const dateValue = [currentYear, String(today.getMonth() + 1).padStart(2,'0'), String(today.getDate()).padStart(2,'0')].join('-');
 get('date').min = currentYear + '-01-01';
 get('date').max = currentYear + '-12-31';
-get('date').value = currentYear + '-01-01';
+get('date').value = dateValue;
 for (const [prefix,label] of groups) {
   if (['SS','VS'].includes(prefix)) continue;
   const option = document.createElement('option');
