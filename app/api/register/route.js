@@ -185,7 +185,8 @@ export async function POST(request) {
   }
 
   const { series, date, subject, code, quantity = 1, anchorBase } = body || {};
-  const inserting = anchorBase !== undefined && anchorBase !== null;
+  const inserting = body?.inserting === true || anchorBase !== undefined && anchorBase !== null;
+  const requestedAnchorBase = anchorBase === undefined || anchorBase === null ? null : anchorBase;
   const year = typeof date === 'string' ? Number(date.slice(0, 4)) : NaN;
 
   if (!seriesValues.has(series)) return jsonError('Jenis surat tidak valid.', 400);
@@ -201,10 +202,9 @@ export async function POST(request) {
   if (!Number.isInteger(quantity) || quantity < 1 || quantity > 1000) {
     return jsonError('Jumlah nomor harus antara 1 dan 1000.', 400);
   }
-  if (inserting && (!Number.isInteger(anchorBase) || anchorBase < 1)) {
+  if (anchorBase !== undefined && anchorBase !== null && (!Number.isInteger(anchorBase) || anchorBase < 1)) {
     return jsonError('Nomor induk tidak valid.', 400);
   }
-
   try {
     const sql = getDatabase();
     await ensureSchema(sql);
@@ -241,11 +241,19 @@ export async function POST(request) {
     } else {
       records = await sql`
         WITH anchor AS (
-          SELECT issue_year, series, issue_date, sequence_number
+          SELECT issue_year, series, sequence_number
           FROM issued_letters
           WHERE issue_year = ${year} AND series = ${series}
-            AND issue_date = ${date}::date AND sequence_number = ${anchorBase}
             AND suffix_order = 0
+            AND (
+              (${requestedAnchorBase}::integer IS NULL AND issue_date <= ${date}::date)
+              OR (
+                ${requestedAnchorBase}::integer IS NOT NULL
+                AND issue_date = ${date}::date
+                AND sequence_number = ${requestedAnchorBase}
+              )
+            )
+          ORDER BY issue_date DESC, sequence_number DESC
           LIMIT 1
         ),
         counter AS (
@@ -258,7 +266,7 @@ export async function POST(request) {
             last_suffix - ${quantity} + 1 AS first_suffix
         ),
         generated AS (
-          SELECT counter.issue_year, counter.series, anchor.issue_date,
+          SELECT counter.issue_year, counter.series, ${date}::date AS issue_date,
             counter.base_number, counter.first_suffix + seq.index AS suffix_order
           FROM counter
           JOIN anchor ON anchor.issue_year = counter.issue_year
@@ -283,7 +291,10 @@ export async function POST(request) {
     }
 
     if (records.length !== quantity) {
-      return jsonError('Nomor induk tidak ditemukan pada tanggal dan jenis surat tersebut.', 409);
+      return jsonError(
+        'Belum ada nomor sebelumnya untuk jenis surat ini. Buat nomor utama terlebih dahulu.',
+        409
+      );
     }
     return Response.json({ records }, { status: 201 });
   } catch (error) {

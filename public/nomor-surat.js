@@ -49,10 +49,19 @@ function makeDemoRecord({series, date = dateValue, base, suffix = 0, subject, co
   };
 }
 
+function offsetDemoDate(dateValue, offset) {
+  const date = new Date(dateValue + 'T00:00:00Z');
+  date.setUTCDate(date.getUTCDate() + offset);
+  if (date.getUTCFullYear() !== currentYear) {
+    return currentYear + (offset < 0 ? '-01-01' : '-12-31');
+  }
+  return date.toISOString().slice(0, 10);
+}
+
 let demoRegister = demoMode ? [
-  makeDemoRecord({series:'B', base:1, subject:'Surat tugas petugas pendataan', code:'KP 650'}),
-  makeDemoRecord({series:'B', base:2, subject:'Undangan rapat koordinasi kegiatan statistik', code:'HM 340'}),
-  makeDemoRecord({series:'B', base:3, subject:'Pelatihan petugas sensus', code:'SS 220'}),
+  makeDemoRecord({series:'B', date:offsetDemoDate(dateValue, -2), base:1, subject:'Surat tugas petugas pendataan', code:'KP 650'}),
+  makeDemoRecord({series:'B', date:offsetDemoDate(dateValue, -1), base:2, subject:'Undangan rapat koordinasi kegiatan statistik', code:'HM 340'}),
+  makeDemoRecord({series:'B', date:offsetDemoDate(dateValue, 1), base:3, subject:'Pelatihan petugas sensus', code:'SS 220'}),
   makeDemoRecord({series:'SK', base:1, subject:'Penetapan tim pelaksana kegiatan', code:'KP 170'})
 ] : [];
 const demoCounters = new Map(['B','SK','R','S'].map(series => [
@@ -61,15 +70,17 @@ const demoCounters = new Map(['B','SK','R','S'].map(series => [
 ]));
 const demoSuffixCounters = new Map();
 
-function createDemoNumbers({series, date, subject, code, quantity, anchorBase}) {
-  let base = anchorBase;
+function createDemoNumbers({series, date, subject, code, quantity, inserting: insertMode, anchorBase}) {
+  let base;
   let firstSuffix = 0;
-  if (anchorBase !== undefined) {
-    const anchorExists = demoRegister.some(row =>
-      row.series === series && row.date === date && row.base === anchorBase && row.suffix === 0
-    );
-    if (!anchorExists) throw new Error('Nomor induk simulasi tidak ditemukan pada tanggal dan jenis surat tersebut.');
-    const counterKey = series + ':' + anchorBase;
+  if (insertMode) {
+    const anchor = demoRegister
+      .filter(row => row.series === series && row.suffix === 0
+        && (anchorBase === undefined ? row.date <= date : row.date === date && row.base === anchorBase))
+      .sort((a,b) => b.date.localeCompare(a.date) || b.base - a.base)[0];
+    if (!anchor) throw new Error('Belum ada nomor sebelumnya untuk jenis surat ini. Buat nomor utama terlebih dahulu.');
+    base = anchor.base;
+    const counterKey = series + ':' + base;
     firstSuffix = (demoSuffixCounters.get(counterKey) || 0) + 1;
     demoSuffixCounters.set(counterKey, firstSuffix + quantity - 1);
   } else {
@@ -80,8 +91,8 @@ function createDemoNumbers({series, date, subject, code, quantity, anchorBase}) 
   const records = Array.from({length:quantity}, (_, index) => makeDemoRecord({
     series,
     date,
-    base:anchorBase === undefined ? base + index : base,
-    suffix:anchorBase === undefined ? 0 : firstSuffix + index,
+    base:insertMode ? base : base + index,
+    suffix:insertMode ? firstSuffix + index : 0,
     subject,
     code
   }));
@@ -136,12 +147,15 @@ async function createNumbers(payload) {
 
 async function refreshAnchors() {
   const date = get('date').value;
-  if (!date) return;
+  if (!inserting || !date) return;
   const requestId = ++anchorRequest;
+  get('form-status').textContent = 'Memeriksa nomor pada tanggal terpilih…';
   try {
     const {anchors} = await fetchRegister({series:get('series').value, date, page:1});
     if (requestId !== anchorRequest) return;
-    get('anchor').replaceChildren(...(anchors.length ? anchors : [{base:'',number:'Belum ada nomor pada tanggal dan seri ini'}]).map(row => {
+    get('anchor-field').hidden = anchors.length === 0;
+    get('anchor-fallback').hidden = anchors.length > 0;
+    get('anchor').replaceChildren(...anchors.map(row => {
       const option = document.createElement('option');
       option.value = row.base;
       option.textContent = row.number;
@@ -161,7 +175,6 @@ function showMenu(menu) {
   get('number-panel').hidden = catalogOpen;
   for (const id of ['regular','insert','catalog']) get(id).setAttribute('aria-pressed', String(id === menu));
   get('insert-note').hidden = !inserting;
-  get('anchor-field').hidden = !inserting;
   get('issue').textContent = inserting ? 'Sisipkan Nomor' : 'Ambil Nomor';
   get('form-status').textContent = '';
   if (inserting) refreshAnchors();
@@ -435,7 +448,6 @@ get('form').onsubmit = async event => {
     return;
   }
   const date = get('date').value;
-  const base = Number(get('anchor').value);
   const submitButton = get('issue');
   submitButton.disabled = true;
   get('form-status').textContent = demoMode ? 'Membuat nomor simulasi sementara…' : 'Menyimpan nomor ke register bersama…';
@@ -446,7 +458,8 @@ get('form').onsubmit = async event => {
       subject,
       code:selected.code,
       quantity,
-      ...(inserting ? {anchorBase:base} : {})
+      inserting,
+      ...(inserting && !get('anchor-field').hidden ? {anchorBase:Number(get('anchor').value)} : {})
     })).map(record => record.number);
     historyPage = 1;
     get('history-series').value = series;
@@ -462,7 +475,6 @@ get('form').onsubmit = async event => {
     get('form-status').textContent = '';
     get('result').hidden = false;
     get('result').scrollIntoView({block:'nearest'});
-    if (inserting) await refreshAnchors();
   } catch (error) {
     get('form-status').textContent = error.message;
   } finally {

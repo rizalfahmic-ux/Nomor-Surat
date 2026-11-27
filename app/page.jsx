@@ -57,7 +57,7 @@ export function ApplicationPage({ demo = false }) {
                 </div>
                 <div id="insert-note" className="notice" hidden>
                   <h2>Sisipkan Nomor</h2>
-                  <p>Pilih tanggal dan seri yang sudah memiliki nomor. Sisipan mengikuti nomor induk yang dipilih.</p>
+                  <p>Jika ada nomor pada tanggal ini, pilih nomor induknya. Jika belum ada, sistem otomatis menggunakan nomor terakhir dari tanggal sebelumnya yang paling dekat.</p>
                 </div>
                 <div className="row">
                   <label>Jenis surat
@@ -72,7 +72,10 @@ export function ApplicationPage({ demo = false }) {
                     <input type="date" id="date" required />
                   </label>
                 </div>
-                <label id="anchor-field" hidden>Nomor induk<select id="anchor"></select></label>
+                <label id="anchor-field" hidden>Nomor induk
+                  <select id="anchor"></select>
+                </label>
+                <p id="anchor-fallback" className="helper" hidden>Tidak ada nomor pada tanggal ini. Sisipan akan mengikuti nomor terakhir dari tanggal sebelumnya yang paling dekat.</p>
                 <label id="sk-field" hidden>Tipe SK
                   <select id="sk"><option>Umum</option><option>Personel</option></select>
                 </label>
